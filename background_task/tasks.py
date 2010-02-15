@@ -27,6 +27,9 @@ class TaskProxy(object):
         self.name = name
         self.task_function = task_function
     
+    def __call__(self, schedule=None, *arg, **kw):
+        pass
+    
     def __unicode__(self):
         return u'TaskProxy(%s)' % self.name
 
