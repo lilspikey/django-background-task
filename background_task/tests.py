@@ -91,6 +91,30 @@ class TestTaskRunner(TransactionTestCase):
         self.failIf(locked_task.locked_at is None)
         self.failUnlessEqual('mytask', locked_task.task_name)
 
+class TestTaskModel(TransactionTestCase):
+    
+    def test_lock_uncontested(self):
+        task = Task.objects.create_task('mytask')
+        self.failUnless(task.locked_by is None)
+        self.failUnless(task.locked_at is None)
+        
+        locked_task = task.lock('mylock')
+        self.failUnlessEqual('mylock', locked_task.locked_by)
+        self.failIf(locked_task.locked_at is None)
+        self.failUnlessEqual(task.pk, locked_task.pk)
+    
+    def test_lock_contested(self):
+        # locking should actually look at db, not object
+        # in memory
+        task = Task.objects.create_task('mytask')
+        self.failIf(task.lock('mylock') is None)
+        
+        self.failUnless(task.lock('otherlock') is None)
+    
+    def test__unicode__(self):
+        task = Task.objects.create_task('mytask')
+        self.failUnlessEqual(u'Task(mytask)', unicode(task))
+
 class TestTasks(TransactionTestCase):
     
     def setUp(self):
@@ -120,8 +144,10 @@ class TestTasks(TransactionTestCase):
         self.set_fields(two='2')
         self.set_fields(three='3')
         
-        while tasks.run_next_task():
-            pass
+        for i in range(3):
+            self.failUnless(tasks.run_next_task())
+        
+        self.failIf(tasks.run_next_task()) # everything should have been run
         
         for field, value in [('one', '1'), ('two', '2'), ('three', '3')]:
             self.failUnless(hasattr(self, field))
