@@ -58,10 +58,22 @@ class DBTaskRunner(object):
                 return locked_task
         return None
     
+    @transaction.autocommit
+    def run_task(self, tasks, task):
+        try:
+            args, kwargs = task.params()
+            tasks.run_task(task.task_name, args, kwargs)
+            # task done, so can delete it
+            task.delete()
+            return True
+        except Exception, e:
+            # TODO log error and reschedule
+            return False
+    
     def run_next_task(self, tasks):
         task = self.get_task_to_run()
         if task:
-            pass
+            return self.run_task(tasks, task)
         else:
             return False
 

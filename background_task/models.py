@@ -13,13 +13,11 @@ class TaskManager(models.Manager):
         qs = self.get_query_set()
         
         now = datetime.now()
-        return qs.filter(run_at__lt=now, locked_by=None).order_by('-priority', 'run_at')
+        return qs.filter(run_at__lte=now, locked_by=None).order_by('-priority', 'run_at')
     
     def create_task(self, task_name, args=None, kwargs=None, run_at=None, priority=0):
-        if args is None:
-            args = ()
-        if kwargs is None:
-            kwargs = {}
+        args   = args or ()
+        kwargs = kwargs or {}
         if run_at is None:
             run_at = datetime.now()
         
@@ -57,6 +55,12 @@ class Task(models.Model):
     locked_at   = models.DateTimeField(db_index=True, null=True, blank=True)
     
     objects = TaskManager()
+    
+    def params(self):
+        args, kwargs = simplejson.loads(self.task_params)
+        # need to coerce kwargs keys to str
+        kwargs = dict((str(k), v) for k, v in kwargs.items())
+        return args, kwargs
     
     def lock(self, locked_by):
         unlocked = Task.objects.filter(pk=self.pk, locked_by=None)
