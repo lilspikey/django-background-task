@@ -65,15 +65,14 @@ class DBTaskRunner(object):
             tasks.run_task(task.task_name, args, kwargs)
             # task done, so can delete it
             task.delete()
-            return True
         except Exception, e:
-            # TODO log error and reschedule
-            return False
+            task.reschedule(e)
     
     def run_next_task(self, tasks):
         task = self.get_task_to_run()
         if task:
-            return self.run_task(tasks, task)
+            self.run_task(tasks, task)
+            return True
         else:
             return False
 

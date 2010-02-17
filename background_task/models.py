@@ -69,5 +69,20 @@ class Task(models.Model):
             return Task.objects.get(pk=self.pk)
         return None
     
+    def reschedule(self, err):
+        self.last_error = getattr(err, 'message', str(err))
+        self.failed_at  = datetime.now()
+        self.attempts += 1
+        
+        backoff = timedelta(seconds=(self.attempts ** 4) + 5)
+        self.run_at = datetime.now() + backoff
+        
+        # and unlock
+        self.locked_by = None
+        self.locked_at = None
+        
+        self.save()
+        
+    
     def __unicode__(self):
         return u'Task(%s)' % self.task_name

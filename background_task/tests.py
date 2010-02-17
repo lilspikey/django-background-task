@@ -125,7 +125,12 @@ class TestTasks(TransactionTestCase):
             for key, value in fields.items():
                 setattr(self, key, value)
         
+        @tasks.background(name='throws_error')
+        def throws_error():
+            raise RuntimeError("an error")
+        
         self.set_fields = set_fields
+        self.throws_error = throws_error
     
     def test_run_next_task_nothing_scheduled(self):
         self.failIf(tasks.run_next_task())
@@ -152,4 +157,30 @@ class TestTasks(TransactionTestCase):
         for field, value in [('one', '1'), ('two', '2'), ('three', '3')]:
             self.failUnless(hasattr(self, field))
             self.failUnlessEqual(value, getattr(self, field))
+    
+    def test_run_next_task_error_handling(self):
+        self.throws_error()
+        
+        all_tasks = Task.objects.all()
+        self.failUnlessEqual(1, all_tasks.count())
+        original_task = all_tasks[0]
+        
+        # should run, but trigger error
+        self.failUnless(tasks.run_next_task())
+        
+        all_tasks = Task.objects.all()
+        self.failUnlessEqual(1, all_tasks.count())
+        
+        failed_task = all_tasks[0]
+        # should have an error recorded
+        self.failIfEqual('', failed_task.last_error)
+        self.failIf(failed_task.failed_at is None)
+        self.failUnlessEqual(1, failed_task.attempts)
+        
+        # should have been rescheduled for the future
+        # and no longer locked
+        self.failUnless(failed_task.run_at > original_task.run_at)
+        self.failUnless(failed_task.locked_by is None)
+        self.failUnless(failed_task.locked_at is None)
+        
         
