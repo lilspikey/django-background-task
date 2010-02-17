@@ -1,5 +1,8 @@
 import unittest
 from django.test import TransactionTestCase
+from django.conf import settings
+
+from datetime import timedelta
 
 from background_task.tasks import tasks
 from background_task.models import Task
@@ -111,6 +114,18 @@ class TestTaskModel(TransactionTestCase):
         
         self.failUnless(task.lock('otherlock') is None)
     
+    def test_lock_expired(self):
+        settings.MAX_RUN_TIME = 60
+        task = Task.objects.create_task('mytask')
+        locked_task = task.lock('mylock')
+        
+        # force expire the lock
+        locked_task.locked_at = locked_task.locked_at - timedelta(seconds=(settings.MAX_RUN_TIME+2))
+        locked_task.save()
+        
+        # now try to get the lock again
+        self.failIf(task.lock('otherlock') is None)
+    
     def test__unicode__(self):
         task = Task.objects.create_task('mytask')
         self.failUnlessEqual(u'Task(mytask)', unicode(task))
@@ -119,6 +134,8 @@ class TestTasks(TransactionTestCase):
     
     def setUp(self):
         super(TestTasks, self).setUp()
+        
+        settings.MAX_RUN_TIME = 60
         
         @tasks.background(name='set_fields')
         def set_fields(**fields):
@@ -194,7 +211,30 @@ class TestTasks(TransactionTestCase):
         
         self.failIf(tasks.run_next_task())
         
+        self.failIf(hasattr(self, 'locked'))
         all_tasks = Task.objects.all()
         self.failUnlessEqual(1, all_tasks.count())
     
+    def test_run_next_task_unlocks_after_MAX_RUN_TIME(self):
+        self.set_fields(lock_overridden=True)
         
+        all_tasks = Task.objects.all()
+        self.failUnlessEqual(1, all_tasks.count())
+        original_task = all_tasks[0]
+        locked_task = original_task.lock('lockname')
+        
+        self.failIf(tasks.run_next_task())
+        
+        self.failIf(hasattr(self, 'lock_overridden'))
+        
+        # put lot time into past
+        locked_task.locked_at = locked_task.locked_at - timedelta(seconds=(settings.MAX_RUN_TIME+2))
+        locked_task.save()
+                
+        # so now we should be able to override the lock
+        # and run the task
+        self.failUnless(tasks.run_next_task())
+        self.failUnlessEqual(0, Task.objects.count())
+        
+        self.failUnless(hasattr(self, 'lock_overridden'))
+        self.failUnless(self.lock_overridden)

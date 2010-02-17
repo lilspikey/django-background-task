@@ -1,19 +1,26 @@
 from django.db import models
 from django.db.models import Q
-
-# inspired by http://github.com/tobi/delayed_job
+from django.conf import settings
 
 from django.utils import simplejson
 from datetime import datetime, timedelta
 from hashlib import sha1
 
+# inspired by http://github.com/tobi/delayed_job
+
 class TaskManager(models.Manager):
     
     def find_available(self):
-        qs = self.get_query_set()
-        
         now = datetime.now()
-        return qs.filter(run_at__lte=now, locked_by=None).order_by('-priority', 'run_at')
+        qs = self.unlocked(now)
+        return qs.filter(run_at__lte=now).order_by('-priority', 'run_at')
+    
+    def unlocked(self, now):
+        max_run_time = getattr(settings, 'MAX_RUN_TIME', 3600)
+        qs = self.get_query_set()
+        expires_at = now - timedelta(seconds=max_run_time)
+        unlocked = Q(locked_by=None) | Q(locked_at__lt=expires_at)
+        return qs.filter(unlocked)
     
     def create_task(self, task_name, args=None, kwargs=None, run_at=None, priority=0):
         args   = args or ()
@@ -63,8 +70,9 @@ class Task(models.Model):
         return args, kwargs
     
     def lock(self, locked_by):
-        unlocked = Task.objects.filter(pk=self.pk, locked_by=None)
-        updated  = unlocked.update(locked_by=locked_by, locked_at=datetime.now())
+        now = datetime.now()
+        unlocked = Task.objects.unlocked(now).filter(pk=self.pk)
+        updated  = unlocked.update(locked_by=locked_by, locked_at=now)
         if updated:
             return Task.objects.get(pk=self.pk)
         return None
