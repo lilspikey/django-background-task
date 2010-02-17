@@ -182,5 +182,19 @@ class TestTasks(TransactionTestCase):
         self.failUnless(failed_task.run_at > original_task.run_at)
         self.failUnless(failed_task.locked_by is None)
         self.failUnless(failed_task.locked_at is None)
+    
+    def test_run_next_task_does_not_run_locked(self):
+        self.set_fields(locked=True)
+        self.failIf(hasattr(self, 'locked'))
         
+        all_tasks = Task.objects.all()
+        self.failUnlessEqual(1, all_tasks.count())
+        original_task = all_tasks[0]
+        original_task.lock('lockname')
+        
+        self.failIf(tasks.run_next_task())
+        
+        all_tasks = Task.objects.all()
+        self.failUnlessEqual(1, all_tasks.count())
+    
         
