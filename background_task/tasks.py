@@ -82,6 +82,12 @@ class TaskProxy(object):
         self.schedule = schedule
     
     def _run_at_from_schedule(self, schedule):
+        # schedule may either be dictionary possinly containing a run_at
+        # value, or if not then it will be the value of run_at itself.
+        # the run at value can either be a datetime object of when to run
+        # the task or a timedelta which will be added to datetime.now()
+        # to create a datetime or else an int, which will be treated as
+        # seconds and added to datetime.now() to also create a datetime
         run_at = None
         if schedule:
             if isinstance(schedule, (int, timedelta, datetime)):
