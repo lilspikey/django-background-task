@@ -1,7 +1,7 @@
 from models import Task
 
 import os
-
+from datetime import datetime, timedelta
 from django.db import transaction
 
 
@@ -95,10 +95,13 @@ class TaskProxy(object):
             else:
                 run_at = schedule.get('run_at', None)
             
-            if isinstance(run_at, int):
-                run_at = datetime.now() + timedelta(seconds=run_at)
-            if isinstance(run_at, timedelta):
-                run_at = datetime.now() + run_at
+            if run_at:
+                if isinstance(run_at, int):
+                    run_at = datetime.now() + timedelta(seconds=run_at)
+                if isinstance(run_at, timedelta):
+                    run_at = datetime.now() + run_at
+            else:
+                run_at = None
         return run_at
     
     def _priority_from_schedule(self, schedule):

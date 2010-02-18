@@ -2,7 +2,7 @@ import unittest
 from django.test import TransactionTestCase
 from django.conf import settings
 
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from background_task.tasks import tasks
 from background_task.models import Task
@@ -48,7 +48,7 @@ class TestTaskProxy(unittest.TestCase):
         super(TestTaskProxy, self).setUp()
         self.proxy = tasks.background()(record_task)
     
-    def test_run_task(self):        
+    def test_run_task(self):
         tasks.run_task(self.proxy.name, [], {})
         self.failUnlessEqual(((), {}), _recorded.pop())
         
@@ -58,12 +58,41 @@ class TestTaskProxy(unittest.TestCase):
         tasks.run_task(self.proxy.name, [], {'kw': 1})
         self.failUnlessEqual(((), {'kw': 1}), _recorded.pop())
     
-    def test_priority_from_schedule(self):
+    def test__priority_from_schedule(self):
         self.failUnlessEqual(0, self.proxy._priority_from_schedule(None))
         self.failUnlessEqual(0, self.proxy._priority_from_schedule({}))
         self.failUnlessEqual(0, self.proxy._priority_from_schedule({ 'priority': 0 }))
         self.failUnlessEqual(1, self.proxy._priority_from_schedule({ 'priority': 1 }))
         self.failUnlessEqual(0, self.proxy._priority_from_schedule('hfdsjfhkj'))
+    
+    def _within_one_second(self, d1, d2):
+        self.failUnless(isinstance(d1, datetime))
+        self.failUnless(isinstance(d2, datetime))
+        self.failUnless(abs(d1 - d2) <= timedelta(seconds=1))
+    
+    def test__run_at_from_schedule(self):
+        for schedule in [None, 0, {}, timedelta(seconds=0), { 'run_at': 0 }, { 'run_at': timedelta(seconds=0) }]:
+            self.failUnless(self.proxy._run_at_from_schedule(schedule) is None)
+        
+        fixed_dt = datetime.now() + timedelta(seconds=60)
+        dt = self.proxy._run_at_from_schedule(fixed_dt)
+        self._within_one_second(dt, fixed_dt)
+        
+        dt = self.proxy._run_at_from_schedule({ 'run_at': fixed_dt })
+        self._within_one_second(dt, fixed_dt)
+        
+        dt = self.proxy._run_at_from_schedule(90)
+        self._within_one_second(dt, datetime.now() + timedelta(seconds=90))
+        
+        dt = self.proxy._run_at_from_schedule(timedelta(seconds=35))
+        self._within_one_second(dt, datetime.now() + timedelta(seconds=35))
+        
+        dt = self.proxy._run_at_from_schedule({ 'run_at': 10 })
+        self._within_one_second(dt, datetime.now() + timedelta(seconds=10))
+        
+        dt = self.proxy._run_at_from_schedule({ 'run_at': timedelta(seconds=15) })
+        self._within_one_second(dt, datetime.now() + timedelta(seconds=15))
+        
 
 class TestSchedulingTasks(TransactionTestCase):
     
