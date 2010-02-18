@@ -276,3 +276,33 @@ class TestTasks(TransactionTestCase):
         
         self.failUnless(hasattr(self, 'lock_overridden'))
         self.failUnless(self.lock_overridden)
+    
+    def test_default_schedule_used_for_run_at(self):
+        
+        @tasks.background(name='default_schedule_used_for_run_at', schedule=60)
+        def default_schedule_used_for_time():
+            pass
+        
+        now = datetime.now()
+        default_schedule_used_for_time()
+        
+        all_tasks = Task.objects.all()
+        self.failUnlessEqual(1, all_tasks.count())
+        task = all_tasks[0]
+        
+        self.failUnless(now < task.run_at)
+        self.failUnless((task.run_at - now) <= timedelta(seconds=61))
+        self.failUnless((task.run_at - now) >= timedelta(seconds=59))
+    
+    def test_default_schedule_used_for_priority(self):
+        @tasks.background(name='default_schedule_used_for_priority', schedule={ 'priority': 2 })
+        def default_schedule_used_for_priority():
+            pass
+        
+        now = datetime.now()
+        default_schedule_used_for_priority()
+        
+        all_tasks = Task.objects.all()
+        self.failUnlessEqual(1, all_tasks.count())
+        task = all_tasks[0]
+        self.failUnlessEqual(2, task.priority)
