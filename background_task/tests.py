@@ -306,3 +306,17 @@ class TestTasks(TransactionTestCase):
         self.failUnlessEqual(1, all_tasks.count())
         task = all_tasks[0]
         self.failUnlessEqual(2, task.priority)
+    
+    def test_non_default_schedule_used(self):
+        default_run_at = datetime.now() + timedelta(seconds=90)
+        @tasks.background(name='non_default_schedule_used', schedule={ 'run_at': default_run_at, 'priority': 2 })
+        def default_schedule_used_for_priority():
+            pass
+
+        run_at = datetime.now() + timedelta(seconds=60)
+        default_schedule_used_for_priority(schedule=run_at)
+
+        all_tasks = Task.objects.all()
+        self.failUnlessEqual(1, all_tasks.count())
+        task = all_tasks[0]
+        self.failUnlessEqual(run_at, task.run_at)
