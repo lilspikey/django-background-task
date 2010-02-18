@@ -42,19 +42,28 @@ class TestBackgroundDecorator(unittest.TestCase):
         proxy = tasks.background()(empty_task)
         self.failUnlessEqual(u'TaskProxy(background_task.tests.empty_task)', unicode(proxy))
 
-class TestRunTask(unittest.TestCase):
+class TestTaskProxy(unittest.TestCase):
     
-    def test_run_task(self):
-        proxy = tasks.background()(record_task)
-        
-        tasks.run_task(proxy.name, [], {})
+    def setUp(self):
+        super(TestTaskProxy, self).setUp()
+        self.proxy = tasks.background()(record_task)
+    
+    def test_run_task(self):        
+        tasks.run_task(self.proxy.name, [], {})
         self.failUnlessEqual(((), {}), _recorded.pop())
         
-        tasks.run_task(proxy.name, ['hi'], {})
+        tasks.run_task(self.proxy.name, ['hi'], {})
         self.failUnlessEqual((('hi',), {}), _recorded.pop())
         
-        tasks.run_task(proxy.name, [], {'kw': 1})
+        tasks.run_task(self.proxy.name, [], {'kw': 1})
         self.failUnlessEqual(((), {'kw': 1}), _recorded.pop())
+    
+    def test_priority_from_schedule(self):
+        self.failUnlessEqual(0, self.proxy._priority_from_schedule(None))
+        self.failUnlessEqual(0, self.proxy._priority_from_schedule({}))
+        self.failUnlessEqual(0, self.proxy._priority_from_schedule({ 'priority': 0 }))
+        self.failUnlessEqual(1, self.proxy._priority_from_schedule({ 'priority': 1 }))
+        self.failUnlessEqual(0, self.proxy._priority_from_schedule('hfdsjfhkj'))
 
 class TestSchedulingTasks(TransactionTestCase):
     

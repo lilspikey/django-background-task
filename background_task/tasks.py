@@ -106,7 +106,7 @@ class TaskProxy(object):
         if schedule:
             try:
                 return int(schedule.get('priority', default))
-            except TypeError:
+            except AttributeError:
                 pass
         return default
     
