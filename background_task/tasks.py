@@ -42,11 +42,9 @@ class DBTaskRunner(object):
     Encapsulate the model related logic in here, in case
     we want to support different queues in the future
     '''
-    def schedule(self, task_name, args, kwargs, schedule):
+    def schedule(self, task_name, args, kwargs, run_at=None, priority=0):
         '''Simply create a task object in the database'''
-        task = Task.objects.create_task(task_name, args, kwargs)
-        # TODO actually schedule task at different times
-        # and force re-schedule option if task already exists
+        task = Task.objects.create_task(task_name, args, kwargs, run_at, priority)
     
     @transaction.autocommit
     def get_task_to_run(self):
@@ -83,9 +81,34 @@ class TaskProxy(object):
         self.runner = runner
         self.schedule = schedule
     
+    def _run_at_from_schedule(self, schedule):
+        run_at = None
+        if schedule:
+            if isinstance(schedule, (int, timedelta, datetime)):
+                run_at = schedule
+            else:
+                run_at = schedule.get('run_at', None)
+            
+            if isinstance(run_at, int):
+                run_at = datetime.now() + timedelta(seconds=run_at)
+            if isinstance(run_at, timedelta):
+                run_at = datetime.now() + run_at
+        return run_at
+    
+    def _priority_from_schedule(self, schedule):
+        default = 0
+        if schedule:
+            try:
+                return int(schedule.get('priority', default))
+            except TypeError:
+                pass
+        return default
+    
     def __call__(self, *args, **kwargs):
         schedule = kwargs.pop('schedule', self.schedule)
-        self.runner.schedule(self.name, args, kwargs, schedule)
+        run_at = self._run_at_from_schedule(schedule)
+        priority = self._priority_from_schedule(schedule)
+        self.runner.schedule(self.name, args, kwargs, run_at, priority)
     
     def __unicode__(self):
         return u'TaskProxy(%s)' % self.name
