@@ -77,49 +77,60 @@ class DBTaskRunner(object):
             return False
 
 
-class TaskProxy(object):
-    def __init__(self, name, task_function, schedule, runner):
-        self.name = name
-        self.task_function = task_function
-        self.runner = runner
-        self.schedule = schedule
-
-    def _run_at_from_schedule(self, schedule):
-        # schedule may either be dictionary possinly containing a run_at
-        # value, or if not then it will be the value of run_at itself.
-        # the run at value can either be a datetime object of when to run
-        # the task or a timedelta which will be added to datetime.now()
-        # to create a datetime or else an int, which will be treated as
-        # seconds and added to datetime.now() to also create a datetime
+class TaskSchedule(object):
+    def __init__(self, run_at=None, priority=None):
+        self._run_at = run_at
+        self._priority = priority
+    
+    @classmethod
+    def create(self, schedule):
+        if isinstance(schedule, TaskSchedule):
+            return schedule
+        priority = None
         run_at = None
         if schedule:
             if isinstance(schedule, (int, timedelta, datetime)):
                 run_at = schedule
             else:
                 run_at = schedule.get('run_at', None)
-
-            if run_at:
-                if isinstance(run_at, int):
-                    run_at = datetime.now() + timedelta(seconds=run_at)
-                if isinstance(run_at, timedelta):
-                    run_at = datetime.now() + run_at
-            else:
-                run_at = None
+                priority = schedule.get('priority', None)
+        return TaskSchedule(run_at=run_at, priority=priority)
+    
+    def merge(self, schedule):
+        run_at = self._run_at or schedule._run_at
+        priority = self._priority or schedule._priority
+        return TaskSchedule(run_at, priority)
+    
+    @property
+    def run_at(self):
+        run_at = self._run_at or datetime.now()
+        if isinstance(run_at, int):
+            run_at = datetime.now() + timedelta(seconds=run_at)
+        if isinstance(run_at, timedelta):
+            run_at = datetime.now() + run_at
         return run_at
+    
+    @property
+    def priority(self):
+        return self._priority or 0
+    
+    def __repr__(self):
+        return 'TaskSchedule(run_at=%s, priority=%s)' % (self._run_at,
+                                                         self._priority)
 
-    def _priority_from_schedule(self, schedule):
-        default = 0
-        if schedule:
-            try:
-                return int(schedule.get('priority', default))
-            except AttributeError:
-                pass
-        return default
+
+class TaskProxy(object):
+    def __init__(self, name, task_function, schedule, runner):
+        self.name = name
+        self.task_function = task_function
+        self.runner = runner
+        self.schedule = TaskSchedule.create(schedule)
 
     def __call__(self, *args, **kwargs):
-        schedule = kwargs.pop('schedule', self.schedule)
-        run_at = self._run_at_from_schedule(schedule)
-        priority = self._priority_from_schedule(schedule)
+        schedule = kwargs.pop('schedule', None)
+        schedule = TaskSchedule.create(schedule).merge(self.schedule)
+        run_at = schedule.run_at
+        priority = schedule.priority
         self.runner.schedule(self.name, args, kwargs, run_at, priority)
 
     def __unicode__(self):

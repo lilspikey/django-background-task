@@ -4,7 +4,7 @@ from django.conf import settings
 
 from datetime import timedelta, datetime
 
-from background_task.tasks import tasks
+from background_task.tasks import tasks, TaskSchedule
 from background_task.models import Task
 
 _recorded = []
@@ -64,48 +64,73 @@ class TestTaskProxy(unittest.TestCase):
         tasks.run_task(self.proxy.name, [], {'kw': 1})
         self.failUnlessEqual(((), {'kw': 1}), _recorded.pop())
 
-    def test__priority_from_schedule(self):
-        self.failUnlessEqual(0,
-            self.proxy._priority_from_schedule(None))
-        self.failUnlessEqual(0,
-            self.proxy._priority_from_schedule({}))
-        self.failUnlessEqual(0,
-            self.proxy._priority_from_schedule({'priority': 0}))
-        self.failUnlessEqual(1,
-            self.proxy._priority_from_schedule({'priority': 1}))
-        self.failUnlessEqual(0,
-            self.proxy._priority_from_schedule('hfdsjfhkj'))
 
+class TestTaskSchedule(unittest.TestCase):
+
+    def test_priority(self):
+        self.failUnlessEqual(0, TaskSchedule().priority)
+        self.failUnlessEqual(0, TaskSchedule(priority=0).priority)
+        self.failUnlessEqual(1, TaskSchedule(priority=1).priority)
+        self.failUnlessEqual(2, TaskSchedule(priority=2).priority)
+    
     def _within_one_second(self, d1, d2):
         self.failUnless(isinstance(d1, datetime))
         self.failUnless(isinstance(d2, datetime))
         self.failUnless(abs(d1 - d2) <= timedelta(seconds=1))
 
-    def test__run_at_from_schedule(self):
-        for schedule in [None, 0, {}, timedelta(seconds=0),
-                         {'run_at': 0}, {'run_at': timedelta(seconds=0)}]:
-            self.failUnless(self.proxy._run_at_from_schedule(schedule) is None)
+    def test_run_at(self):
+        for schedule in [None, 0, timedelta(seconds=0)]:
+            now = datetime.now()
+            run_at = TaskSchedule(run_at=schedule).run_at
+            self._within_one_second(run_at, now)
+
+        now = datetime.now()
+        run_at = TaskSchedule(run_at=now).run_at
+        self._within_one_second(run_at, now)
 
         fixed_dt = datetime.now() + timedelta(seconds=60)
-        dt = self.proxy._run_at_from_schedule(fixed_dt)
-        self._within_one_second(dt, fixed_dt)
+        run_at = TaskSchedule(run_at=fixed_dt).run_at
+        self._within_one_second(run_at, fixed_dt)
 
-        dt = self.proxy._run_at_from_schedule({'run_at': fixed_dt})
-        self._within_one_second(dt, fixed_dt)
+        
+        run_at = TaskSchedule(run_at=90).run_at
+        self._within_one_second(run_at, datetime.now() + timedelta(seconds=90))
 
-        dt = self.proxy._run_at_from_schedule(90)
-        self._within_one_second(dt, datetime.now() + timedelta(seconds=90))
+        run_at = TaskSchedule(run_at=timedelta(seconds=35)).run_at
+        self._within_one_second(run_at, datetime.now() + timedelta(seconds=35))
 
-        dt = self.proxy._run_at_from_schedule(timedelta(seconds=35))
-        self._within_one_second(dt, datetime.now() + timedelta(seconds=35))
+    def test_create(self):
+        fixed_dt = datetime.now() + timedelta(seconds=10)
+        schedule = TaskSchedule.create({'run_at': fixed_dt})
+        self.failUnlessEqual(schedule.run_at, fixed_dt)
+        self.failUnlessEqual(0, schedule.priority)
 
-        dt = self.proxy._run_at_from_schedule({'run_at': 10})
-        self._within_one_second(dt, datetime.now() + timedelta(seconds=10))
-
-        dt = self.proxy._run_at_from_schedule({'run_at':
-                                                timedelta(seconds=15)})
-        self._within_one_second(dt, datetime.now() + timedelta(seconds=15))
-
+        schedule = TaskSchedule.create({'run_at': fixed_dt, 'priority': 2})
+        self.failUnlessEqual(schedule.run_at, fixed_dt)
+        self.failUnlessEqual(2, schedule.priority)
+        
+        schedule = TaskSchedule.create(0)
+        self._within_one_second(schedule.run_at, datetime.now())
+        
+        schedule = TaskSchedule.create(10)
+        self._within_one_second(schedule.run_at, 
+                                datetime.now() + timedelta(seconds=10))
+        
+        schedule = TaskSchedule.create(TaskSchedule(run_at=fixed_dt))
+        self.failUnlessEqual(schedule.run_at, fixed_dt)
+        self.failUnlessEqual(0, schedule.priority)
+    
+    def test_merge(self):
+        default = TaskSchedule(run_at=10, priority=2)
+        schedule = TaskSchedule.create(20).merge(default)
+        
+        self._within_one_second(datetime.now() + timedelta(seconds=20),
+                                schedule.run_at)
+        self.failUnlessEqual(2, schedule.priority)
+    
+    def test_repr(self):
+        self.failUnlessEqual('TaskSchedule(run_at=10, priority=0)',
+                             repr(TaskSchedule(run_at=10, priority=0)))
 
 class TestSchedulingTasks(TransactionTestCase):
 
