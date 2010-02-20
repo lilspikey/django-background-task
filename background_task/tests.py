@@ -72,7 +72,7 @@ class TestTaskSchedule(unittest.TestCase):
         self.failUnlessEqual(0, TaskSchedule(priority=0).priority)
         self.failUnlessEqual(1, TaskSchedule(priority=1).priority)
         self.failUnlessEqual(2, TaskSchedule(priority=2).priority)
-    
+
     def _within_one_second(self, d1, d2):
         self.failUnless(isinstance(d1, datetime))
         self.failUnless(isinstance(d2, datetime))
@@ -92,7 +92,6 @@ class TestTaskSchedule(unittest.TestCase):
         run_at = TaskSchedule(run_at=fixed_dt).run_at
         self._within_one_second(run_at, fixed_dt)
 
-        
         run_at = TaskSchedule(run_at=90).run_at
         self._within_one_second(run_at, datetime.now() + timedelta(seconds=90))
 
@@ -108,29 +107,30 @@ class TestTaskSchedule(unittest.TestCase):
         schedule = TaskSchedule.create({'run_at': fixed_dt, 'priority': 2})
         self.failUnlessEqual(schedule.run_at, fixed_dt)
         self.failUnlessEqual(2, schedule.priority)
-        
+
         schedule = TaskSchedule.create(0)
         self._within_one_second(schedule.run_at, datetime.now())
-        
+
         schedule = TaskSchedule.create(10)
-        self._within_one_second(schedule.run_at, 
+        self._within_one_second(schedule.run_at,
                                 datetime.now() + timedelta(seconds=10))
-        
+
         schedule = TaskSchedule.create(TaskSchedule(run_at=fixed_dt))
         self.failUnlessEqual(schedule.run_at, fixed_dt)
         self.failUnlessEqual(0, schedule.priority)
-    
+
     def test_merge(self):
         default = TaskSchedule(run_at=10, priority=2)
         schedule = TaskSchedule.create(20).merge(default)
-        
+
         self._within_one_second(datetime.now() + timedelta(seconds=20),
                                 schedule.run_at)
         self.failUnlessEqual(2, schedule.priority)
-    
+
     def test_repr(self):
         self.failUnlessEqual('TaskSchedule(run_at=10, priority=0)',
                              repr(TaskSchedule(run_at=10, priority=0)))
+
 
 class TestSchedulingTasks(TransactionTestCase):
 
