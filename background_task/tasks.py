@@ -92,6 +92,11 @@ class TaskSchedule(object):
         return 'TaskSchedule(run_at=%s, priority=%s)' % (self._run_at,
                                                          self._priority)
 
+    def __eq__(self, other):
+        return self._run_at == other._run_at \
+           and self._priority == other._priority \
+           and self._action == other._action
+
 
 class DBTaskRunner(object):
 
@@ -105,8 +110,13 @@ class DBTaskRunner(object):
     def schedule(self, task_name, args, kwargs, run_at=None,
                        priority=0, action=TaskSchedule.SCHEDULE):
         '''Simply create a task object in the database'''
+        get_or_create = (action == TaskSchedule.CHECK_EXISTING)
         task = Task.objects.create_task(task_name, args, kwargs,
-                                        run_at, priority)
+                                        run_at, priority,
+                                        get_or_create=get_or_create)
+        if action == TaskSchedule.REPLACE_EXISTING:
+            task.delete_existing()
+            
 
     @transaction.autocommit
     def get_task_to_run(self):
@@ -149,7 +159,8 @@ class TaskProxy(object):
         schedule = TaskSchedule.create(schedule).merge(self.schedule)
         run_at = schedule.run_at
         priority = schedule.priority
-        self.runner.schedule(self.name, args, kwargs, run_at, priority)
+        action = schedule.action
+        self.runner.schedule(self.name, args, kwargs, run_at, priority, action)
 
     def __unicode__(self):
         return u'TaskProxy(%s)' % self.name

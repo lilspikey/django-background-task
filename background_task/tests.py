@@ -42,6 +42,14 @@ class TestBackgroundDecorator(unittest.TestCase):
         proxy = tasks.background()(record_task)
         self.failUnlessEqual(proxy.task_function, record_task)
 
+    def test_default_schedule(self):
+        proxy = tasks.background()(empty_task)
+        self.failUnlessEqual(TaskSchedule(), proxy.schedule)
+
+    def test_schedule(self):
+        proxy = tasks.background(schedule=10)(empty_task)
+        self.failUnlessEqual(TaskSchedule(run_at=10), proxy.schedule)
+
     def test__unicode__(self):
         proxy = tasks.background()(empty_task)
         self.failUnlessEqual(u'TaskProxy(background_task.tests.empty_task)',
@@ -169,7 +177,54 @@ class TestSchedulingTasks(TransactionTestCase):
         task = all_tasks[0]
         self.failUnlessEqual('test_background_gets_scheduled', task.task_name)
         self.failUnlessEqual('[[1], {}]', task.task_params)
+    
+    def test_replace_existing(self):
 
+        replace_existing = TaskSchedule.REPLACE_EXISTING
+
+        @tasks.background(name='test_replace_existing',
+                         schedule=TaskSchedule(action=replace_existing))
+        def replace_fn():
+            pass
+
+        # this should only end up with one task
+        # and it should be scheduled for the later time
+        replace_fn()
+        replace_fn(schedule=90)
+
+        all_tasks = Task.objects.all()
+        self.failUnlessEqual(1, all_tasks.count())
+        task = all_tasks[0]
+        self.failUnlessEqual('test_replace_existing', task.task_name)
+
+        # check new task is scheduled for later on
+        now = datetime.now()
+        self.failUnless(now + timedelta(seconds=89) < task.run_at)
+        self.failUnless(now + timedelta(seconds=91) > task.run_at)
+
+    def test_check_existing(self):
+
+        check_existing = TaskSchedule.CHECK_EXISTING
+
+        @tasks.background(name='test_check_existing',
+                         schedule=TaskSchedule(action=check_existing))
+        def check_fn():
+            pass
+
+        # this should only end up with the first call
+        # scheduled
+        check_fn()
+        check_fn(schedule=90)
+
+        all_tasks = Task.objects.all()
+        self.failUnlessEqual(1, all_tasks.count())
+        task = all_tasks[0]
+        self.failUnlessEqual('test_check_existing', task.task_name)
+
+        # check new task is scheduled for the earlier time
+        now = datetime.now()
+        self.failUnless(now - timedelta(seconds=1) < task.run_at)
+        self.failUnless(now + timedelta(seconds=1) > task.run_at)
 
 class TestTaskRunner(TransactionTestCase):
 
