@@ -34,6 +34,65 @@ class Tasks(object):
         return self._runner.run_next_task(self)
 
 
+class TaskSchedule(object):
+    SCHEDULE = 0
+    REPLACE_EXISTING = 1
+    CHECK_EXISTING = 2
+
+    def __init__(self, run_at=None, priority=None, action=None):
+        self._run_at = run_at
+        self._priority = priority
+        self._action = action
+
+    @classmethod
+    def create(self, schedule):
+        if isinstance(schedule, TaskSchedule):
+            return schedule
+        priority = None
+        run_at = None
+        action = None
+        if schedule:
+            if isinstance(schedule, (int, timedelta, datetime)):
+                run_at = schedule
+            else:
+                run_at = schedule.get('run_at', None)
+                priority = schedule.get('priority', None)
+                action = schedule.get('action', None)
+        return TaskSchedule(run_at=run_at, priority=priority, action=action)
+
+    def merge(self, schedule):
+        params = {}
+        for name in ['run_at', 'priority', 'action']:
+            attr_name = '_%s' % name
+            value = getattr(self, attr_name, None)
+            if value is None:
+                params[name] = getattr(schedule, attr_name, None)
+            else:
+                params[name] = value
+        return TaskSchedule(**params)
+
+    @property
+    def run_at(self):
+        run_at = self._run_at or datetime.now()
+        if isinstance(run_at, int):
+            run_at = datetime.now() + timedelta(seconds=run_at)
+        if isinstance(run_at, timedelta):
+            run_at = datetime.now() + run_at
+        return run_at
+
+    @property
+    def priority(self):
+        return self._priority or 0
+
+    @property
+    def action(self):
+        return self._action or TaskSchedule.SCHEDULE
+
+    def __repr__(self):
+        return 'TaskSchedule(run_at=%s, priority=%s)' % (self._run_at,
+                                                         self._priority)
+
+
 class DBTaskRunner(object):
 
     def __init__(self):
@@ -43,7 +102,8 @@ class DBTaskRunner(object):
     Encapsulate the model related logic in here, in case
     we want to support different queues in the future
     '''
-    def schedule(self, task_name, args, kwargs, run_at=None, priority=0):
+    def schedule(self, task_name, args, kwargs, run_at=None,
+                       priority=0, action=TaskSchedule.SCHEDULE):
         '''Simply create a task object in the database'''
         task = Task.objects.create_task(task_name, args, kwargs,
                                         run_at, priority)
@@ -75,54 +135,6 @@ class DBTaskRunner(object):
             return True
         else:
             return False
-
-
-class TaskSchedule(object):
-    def __init__(self, run_at=None, priority=None):
-        self._run_at = run_at
-        self._priority = priority
-    
-    @classmethod
-    def create(self, schedule):
-        if isinstance(schedule, TaskSchedule):
-            return schedule
-        priority = None
-        run_at = None
-        if schedule:
-            if isinstance(schedule, (int, timedelta, datetime)):
-                run_at = schedule
-            else:
-                run_at = schedule.get('run_at', None)
-                priority = schedule.get('priority', None)
-        return TaskSchedule(run_at=run_at, priority=priority)
-    
-    def merge(self, schedule):
-        if self._run_at is None:
-            run_at = schedule._run_at
-        else:
-            run_at = self._run_at
-        if self._priority is None:
-            priority = schedule._priority
-        else:
-            priority = self._priority
-        return TaskSchedule(run_at, priority)
-    
-    @property
-    def run_at(self):
-        run_at = self._run_at or datetime.now()
-        if isinstance(run_at, int):
-            run_at = datetime.now() + timedelta(seconds=run_at)
-        if isinstance(run_at, timedelta):
-            run_at = datetime.now() + run_at
-        return run_at
-    
-    @property
-    def priority(self):
-        return self._priority or 0
-    
-    def __repr__(self):
-        return 'TaskSchedule(run_at=%s, priority=%s)' % (self._run_at,
-                                                         self._priority)
 
 
 class TaskProxy(object):

@@ -103,10 +103,14 @@ class TestTaskSchedule(unittest.TestCase):
         schedule = TaskSchedule.create({'run_at': fixed_dt})
         self.failUnlessEqual(schedule.run_at, fixed_dt)
         self.failUnlessEqual(0, schedule.priority)
+        self.failUnlessEqual(TaskSchedule.SCHEDULE, schedule.action)
 
-        schedule = TaskSchedule.create({'run_at': fixed_dt, 'priority': 2})
+        schedule = {'run_at': fixed_dt, 'priority': 2,
+                    'action': TaskSchedule.REPLACE_EXISTING}
+        schedule = TaskSchedule.create(schedule)
         self.failUnlessEqual(schedule.run_at, fixed_dt)
         self.failUnlessEqual(2, schedule.priority)
+        self.failUnlessEqual(TaskSchedule.REPLACE_EXISTING, schedule.action)
 
         schedule = TaskSchedule.create(0)
         self._within_one_second(schedule.run_at, datetime.now())
@@ -118,19 +122,30 @@ class TestTaskSchedule(unittest.TestCase):
         schedule = TaskSchedule.create(TaskSchedule(run_at=fixed_dt))
         self.failUnlessEqual(schedule.run_at, fixed_dt)
         self.failUnlessEqual(0, schedule.priority)
+        self.failUnlessEqual(TaskSchedule.SCHEDULE, schedule.action)
 
     def test_merge(self):
-        default = TaskSchedule(run_at=10, priority=2)
+        default = TaskSchedule(run_at=10, priority=2,
+                               action=TaskSchedule.REPLACE_EXISTING)
         schedule = TaskSchedule.create(20).merge(default)
 
         self._within_one_second(datetime.now() + timedelta(seconds=20),
                                 schedule.run_at)
         self.failUnlessEqual(2, schedule.priority)
-        
+        self.failUnlessEqual(TaskSchedule.REPLACE_EXISTING, schedule.action)
+
         schedule = TaskSchedule.create({'priority': 0}).merge(default)
         self._within_one_second(datetime.now() + timedelta(seconds=10),
                                 schedule.run_at)
         self.failUnlessEqual(0, schedule.priority)
+        self.failUnlessEqual(TaskSchedule.REPLACE_EXISTING, schedule.action)
+
+        action = TaskSchedule.CHECK_EXISTING
+        schedule = TaskSchedule.create({'action': action}).merge(default)
+        self._within_one_second(datetime.now() + timedelta(seconds=10),
+                                schedule.run_at)
+        self.failUnlessEqual(2, schedule.priority)
+        self.failUnlessEqual(action, schedule.action)
 
     def test_repr(self):
         self.failUnlessEqual('TaskSchedule(run_at=10, priority=0)',
