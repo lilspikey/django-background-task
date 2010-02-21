@@ -126,6 +126,11 @@ class TestTaskSchedule(unittest.TestCase):
         self._within_one_second(datetime.now() + timedelta(seconds=20),
                                 schedule.run_at)
         self.failUnlessEqual(2, schedule.priority)
+        
+        schedule = TaskSchedule.create({'priority': 0}).merge(default)
+        self._within_one_second(datetime.now() + timedelta(seconds=10),
+                                schedule.run_at)
+        self.failUnlessEqual(0, schedule.priority)
 
     def test_repr(self):
         self.failUnlessEqual('TaskSchedule(run_at=10, priority=0)',

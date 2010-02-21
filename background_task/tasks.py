@@ -97,8 +97,14 @@ class TaskSchedule(object):
         return TaskSchedule(run_at=run_at, priority=priority)
     
     def merge(self, schedule):
-        run_at = self._run_at or schedule._run_at
-        priority = self._priority or schedule._priority
+        if self._run_at is None:
+            run_at = schedule._run_at
+        else:
+            run_at = self._run_at
+        if self._priority is None:
+            priority = schedule._priority
+        else:
+            priority = self._priority
         return TaskSchedule(run_at, priority)
     
     @property
