@@ -178,26 +178,26 @@ class TestSchedulingTasks(TransactionTestCase):
         self.failUnlessEqual('test_background_gets_scheduled', task.task_name)
         self.failUnlessEqual('[[1], {}]', task.task_params)
 
-    def test_replace_existing(self):
+    def test_reschedule_existing(self):
 
-        replace_existing = TaskSchedule.RESCHEDULE_EXISTING
+        reschedule_existing = TaskSchedule.RESCHEDULE_EXISTING
 
-        @tasks.background(name='test_replace_existing',
-                         schedule=TaskSchedule(action=replace_existing))
-        def replace_fn():
+        @tasks.background(name='test_reschedule_existing',
+                         schedule=TaskSchedule(action=reschedule_existing))
+        def reschedule_fn():
             pass
 
         # this should only end up with one task
         # and it should be scheduled for the later time
-        replace_fn()
-        replace_fn(schedule=90)
+        reschedule_fn()
+        reschedule_fn(schedule=90)
 
         all_tasks = Task.objects.all()
         self.failUnlessEqual(1, all_tasks.count())
         task = all_tasks[0]
-        self.failUnlessEqual('test_replace_existing', task.task_name)
+        self.failUnlessEqual('test_reschedule_existing', task.task_name)
 
-        # check new task is scheduled for later on
+        # check task is scheduled for later on
         now = datetime.now()
         self.failUnless(now + timedelta(seconds=89) < task.run_at)
         self.failUnless(now + timedelta(seconds=91) > task.run_at)
