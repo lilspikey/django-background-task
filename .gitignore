@@ -1,2 +1,3 @@
 .coverage
 *.pyc
+django_background_task.egg-info
