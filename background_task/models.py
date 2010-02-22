@@ -94,6 +94,11 @@ class Task(models.Model):
         self.locked_at = None
 
         self.save()
+    
+    def save(self, *arg, **kw):
+        # force NULL rather than empty string
+        self.locked_by = self.locked_by or None
+        return super(Task, self).save(*arg, **kw)
 
     def __unicode__(self):
         return u'Task(%s)' % self.task_name
