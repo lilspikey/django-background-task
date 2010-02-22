@@ -23,8 +23,8 @@ class TaskManager(models.Manager):
         unlocked = Q(locked_by=None) | Q(locked_at__lt=expires_at)
         return qs.filter(unlocked)
 
-    def create_task(self, task_name, args=None, kwargs=None,
-                    run_at=None, priority=0, get_or_create=False):
+    def new_task(self, task_name, args=None, kwargs=None,
+                 run_at=None, priority=0):
         args = args or ()
         kwargs = kwargs or {}
         if run_at is None:
@@ -33,18 +33,11 @@ class TaskManager(models.Manager):
         task_params = simplejson.dumps((args, kwargs))
         task_hash = sha1(task_name + task_params).hexdigest()
 
-        if get_or_create:
-            defaults = {'priority': priority, 'run_at': run_at}
-            return self.get_or_create(task_name=task_name,
-                                      task_params=task_params,
-                                      task_hash=task_hash,
-                                      defaults=defaults)
-        else:
-            return self.create(task_name=task_name,
-                               task_params=task_params,
-                               task_hash=task_hash,
-                               priority=priority,
-                               run_at=run_at)
+        return Task(task_name=task_name,
+                    task_params=task_params,
+                    task_hash=task_hash,
+                    priority=priority,
+                    run_at=run_at)
 
 
 class Task(models.Model):
@@ -87,14 +80,6 @@ class Task(models.Model):
         if updated:
             return Task.objects.get(pk=self.pk)
         return None
-
-    def delete_existing(self):
-        # delete all tasks that call the same
-        # function, with the same params
-        # and came before this task
-        Task.objects.filter(task_hash=self.task_hash) \
-                    .filter(id__lt=self.id) \
-                    .delete()
 
     def reschedule(self, err):
         self.last_error = getattr(err, 'message', str(err))

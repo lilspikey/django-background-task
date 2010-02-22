@@ -36,7 +36,7 @@ class Tasks(object):
 
 class TaskSchedule(object):
     SCHEDULE = 0
-    REPLACE_EXISTING = 1
+    RESCHEDULE_EXISTING = 1
     CHECK_EXISTING = 2
 
     def __init__(self, run_at=None, priority=None, action=None):
@@ -99,24 +99,34 @@ class TaskSchedule(object):
 
 
 class DBTaskRunner(object):
-
-    def __init__(self):
-        self.worker_name = str(os.getpid())
-
     '''
     Encapsulate the model related logic in here, in case
     we want to support different queues in the future
     '''
+
+    def __init__(self):
+        self.worker_name = str(os.getpid())
+
     def schedule(self, task_name, args, kwargs, run_at=None,
                        priority=0, action=TaskSchedule.SCHEDULE):
         '''Simply create a task object in the database'''
-        get_or_create = (action == TaskSchedule.CHECK_EXISTING)
-        task = Task.objects.create_task(task_name, args, kwargs,
-                                        run_at, priority,
-                                        get_or_create=get_or_create)
-        if action == TaskSchedule.REPLACE_EXISTING:
-            task.delete_existing()
-            
+
+        task = Task.objects.new_task(task_name, args, kwargs,
+                                     run_at, priority)
+
+        if action != TaskSchedule.SCHEDULE:
+            task_hash = task.task_hash
+            unlocked = Task.objects.unlocked(datetime.now())
+            existing = unlocked.filter(task_hash=task_hash)
+            if action == TaskSchedule.RESCHEDULE_EXISTING:
+                updated = existing.update(run_at=run_at, priority=priority)
+                if updated:
+                    return
+            elif action == TaskSchedule.CHECK_EXISTING:
+                if existing.count():
+                    return
+
+        task.save()
 
     @transaction.autocommit
     def get_task_to_run(self):

@@ -114,11 +114,11 @@ class TestTaskSchedule(unittest.TestCase):
         self.failUnlessEqual(TaskSchedule.SCHEDULE, schedule.action)
 
         schedule = {'run_at': fixed_dt, 'priority': 2,
-                    'action': TaskSchedule.REPLACE_EXISTING}
+                    'action': TaskSchedule.RESCHEDULE_EXISTING}
         schedule = TaskSchedule.create(schedule)
         self.failUnlessEqual(schedule.run_at, fixed_dt)
         self.failUnlessEqual(2, schedule.priority)
-        self.failUnlessEqual(TaskSchedule.REPLACE_EXISTING, schedule.action)
+        self.failUnlessEqual(TaskSchedule.RESCHEDULE_EXISTING, schedule.action)
 
         schedule = TaskSchedule.create(0)
         self._within_one_second(schedule.run_at, datetime.now())
@@ -134,19 +134,19 @@ class TestTaskSchedule(unittest.TestCase):
 
     def test_merge(self):
         default = TaskSchedule(run_at=10, priority=2,
-                               action=TaskSchedule.REPLACE_EXISTING)
+                               action=TaskSchedule.RESCHEDULE_EXISTING)
         schedule = TaskSchedule.create(20).merge(default)
 
         self._within_one_second(datetime.now() + timedelta(seconds=20),
                                 schedule.run_at)
         self.failUnlessEqual(2, schedule.priority)
-        self.failUnlessEqual(TaskSchedule.REPLACE_EXISTING, schedule.action)
+        self.failUnlessEqual(TaskSchedule.RESCHEDULE_EXISTING, schedule.action)
 
         schedule = TaskSchedule.create({'priority': 0}).merge(default)
         self._within_one_second(datetime.now() + timedelta(seconds=10),
                                 schedule.run_at)
         self.failUnlessEqual(0, schedule.priority)
-        self.failUnlessEqual(TaskSchedule.REPLACE_EXISTING, schedule.action)
+        self.failUnlessEqual(TaskSchedule.RESCHEDULE_EXISTING, schedule.action)
 
         action = TaskSchedule.CHECK_EXISTING
         schedule = TaskSchedule.create({'action': action}).merge(default)
@@ -177,10 +177,10 @@ class TestSchedulingTasks(TransactionTestCase):
         task = all_tasks[0]
         self.failUnlessEqual('test_background_gets_scheduled', task.task_name)
         self.failUnlessEqual('[[1], {}]', task.task_params)
-    
+
     def test_replace_existing(self):
 
-        replace_existing = TaskSchedule.REPLACE_EXISTING
+        replace_existing = TaskSchedule.RESCHEDULE_EXISTING
 
         @tasks.background(name='test_replace_existing',
                          schedule=TaskSchedule(action=replace_existing))
@@ -226,6 +226,7 @@ class TestSchedulingTasks(TransactionTestCase):
         self.failUnless(now - timedelta(seconds=1) < task.run_at)
         self.failUnless(now + timedelta(seconds=1) > task.run_at)
 
+
 class TestTaskRunner(TransactionTestCase):
 
     def setUp(self):
@@ -236,7 +237,8 @@ class TestTaskRunner(TransactionTestCase):
         self.failIf(self.runner.get_task_to_run())
 
     def test_get_task_to_run(self):
-        task = Task.objects.create_task('mytask', (1), {})
+        task = Task.objects.new_task('mytask', (1), {})
+        task.save()
         self.failUnless(task.locked_by is None)
         self.failUnless(task.locked_at is None)
 
@@ -251,7 +253,8 @@ class TestTaskRunner(TransactionTestCase):
 class TestTaskModel(TransactionTestCase):
 
     def test_lock_uncontested(self):
-        task = Task.objects.create_task('mytask')
+        task = Task.objects.new_task('mytask')
+        task.save()
         self.failUnless(task.locked_by is None)
         self.failUnless(task.locked_at is None)
 
@@ -263,14 +266,16 @@ class TestTaskModel(TransactionTestCase):
     def test_lock_contested(self):
         # locking should actually look at db, not object
         # in memory
-        task = Task.objects.create_task('mytask')
+        task = Task.objects.new_task('mytask')
+        task.save()
         self.failIf(task.lock('mylock') is None)
 
         self.failUnless(task.lock('otherlock') is None)
 
     def test_lock_expired(self):
         settings.MAX_RUN_TIME = 60
-        task = Task.objects.create_task('mytask')
+        task = Task.objects.new_task('mytask')
+        task.save()
         locked_task = task.lock('mylock')
 
         # force expire the lock
@@ -282,7 +287,7 @@ class TestTaskModel(TransactionTestCase):
         self.failIf(task.lock('otherlock') is None)
 
     def test__unicode__(self):
-        task = Task.objects.create_task('mytask')
+        task = Task.objects.new_task('mytask')
         self.failUnlessEqual(u'Task(mytask)', unicode(task))
 
 
