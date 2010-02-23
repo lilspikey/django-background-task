@@ -3,6 +3,7 @@ from models import Task
 import os
 from datetime import datetime, timedelta
 from django.db import transaction
+from django.utils.importlib import import_module
 
 
 class Tasks(object):
@@ -176,3 +177,21 @@ class TaskProxy(object):
         return u'TaskProxy(%s)' % self.name
 
 tasks = Tasks()
+
+
+def autodiscover():
+    '''autodiscover tasks.py files in much the same way as admin app'''
+    import imp
+    from django.conf import settings
+
+    for app in settings.INSTALLED_APPS:
+        try:
+            app_path = import_module(app).__path__
+        except AttributeError:
+            continue
+        try:
+            imp.find_module('tasks', app_path)
+        except ImportError:
+            continue
+
+        import_module("%s.tasks" % app)
