@@ -14,7 +14,8 @@ class TaskManager(models.Manager):
     def find_available(self):
         now = datetime.now()
         qs = self.unlocked(now)
-        return qs.filter(run_at__lte=now).order_by('-priority', 'run_at')
+        ready = qs.filter(run_at__lte=now, failed_at=None)
+        return ready.order_by('-priority', 'run_at')
 
     def unlocked(self, now):
         max_run_time = getattr(settings, 'MAX_RUN_TIME', 3600)
@@ -83,11 +84,14 @@ class Task(models.Model):
 
     def reschedule(self, err):
         self.last_error = getattr(err, 'message', str(err))
-        self.failed_at = datetime.now()
-        self.attempts += 1
+        max_attempts = getattr(settings, 'MAX_ATTEMPTS', 25)
 
-        backoff = timedelta(seconds=(self.attempts ** 4) + 5)
-        self.run_at = datetime.now() + backoff
+        if self.attempts >= max_attempts:
+            self.failed_at = datetime.now()
+        else:
+            self.attempts += 1
+            backoff = timedelta(seconds=(self.attempts ** 4) + 5)
+            self.run_at = datetime.now() + backoff
 
         # and unlock
         self.locked_by = None

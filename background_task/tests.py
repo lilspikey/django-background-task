@@ -297,6 +297,7 @@ class TestTasks(TransactionTestCase):
         super(TestTasks, self).setUp()
 
         settings.MAX_RUN_TIME = 60
+        settings.MAX_ATTEMPTS = 25
 
         @tasks.background(name='set_fields')
         def set_fields(**fields):
@@ -352,7 +353,7 @@ class TestTasks(TransactionTestCase):
         failed_task = all_tasks[0]
         # should have an error recorded
         self.failIfEqual('', failed_task.last_error)
-        self.failIf(failed_task.failed_at is None)
+        self.failUnless(failed_task.failed_at is None)
         self.failUnlessEqual(1, failed_task.attempts)
 
         # should have been rescheduled for the future
@@ -448,3 +449,32 @@ class TestTasks(TransactionTestCase):
         self.failUnlessEqual(1, all_tasks.count())
         task = all_tasks[0]
         self.failUnlessEqual(run_at, task.run_at)
+
+    def test_failed_at_set_after_MAX_ATTEMPTS(self):
+        @tasks.background(name='test_failed_at_set_after_MAX_ATTEMPTS')
+        def failed_at_set_after_MAX_ATTEMPTS():
+            raise RuntimeError('failed')
+
+        failed_at_set_after_MAX_ATTEMPTS()
+
+        available = Task.objects.find_available()
+        self.failUnlessEqual(1, available.count())
+        task = available[0]
+
+        self.failUnless(task.failed_at is None)
+        
+        task.attempts = settings.MAX_ATTEMPTS
+        task.save()
+        
+        # task should be scheduled to run now
+        # but will be marked as failed straight away
+        self.failUnless(tasks.run_next_task())
+        
+        available = Task.objects.find_available()
+        self.failUnlessEqual(0, available.count())
+
+        all_tasks = Task.objects.all()
+        self.failUnlessEqual(1, all_tasks.count())
+        task = all_tasks[0]
+
+        self.failIf(task.failed_at is None)
