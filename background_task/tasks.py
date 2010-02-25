@@ -150,9 +150,13 @@ class DBTaskRunner(object):
             task.reschedule(e)
 
     def run_next_task(self, tasks):
+        # we need to commit to make sure
+        # we can see new tasks as they arrive
         task = self.get_task_to_run()
+        transaction.commit()
         if task:
             self.run_task(tasks, task)
+            transaction.commit()
             return True
         else:
             return False
