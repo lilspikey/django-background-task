@@ -442,7 +442,7 @@ class TestTasks(TransactionTestCase):
         def default_schedule_used_for_priority():
             pass
 
-        run_at = datetime.now() + timedelta(seconds=60)
+        run_at = datetime.now().replace(microsecond=0) + timedelta(seconds=60)
         default_schedule_used_for_priority(schedule=run_at)
 
         all_tasks = Task.objects.all()
