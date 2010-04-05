@@ -11,5 +11,5 @@ There are two parts to using background tasks:
 * creating the task functions and registering them with the scheduler
 * setup a cron task (or long running process) to execute the tasks
 
-.. Django_: http://www.djangoproject.com/
-.. DelayedJob_: http://github.com/tobi/delayed_job
+.. _Django: http://www.djangoproject.com/
+.. _DelayedJob: http://github.com/tobi/delayed_job
