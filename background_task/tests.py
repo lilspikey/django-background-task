@@ -4,8 +4,9 @@ from django.conf import settings
 
 from datetime import timedelta, datetime
 
-from background_task.tasks import tasks, TaskSchedule
+from background_task.tasks import tasks, TaskSchedule, TaskProxy
 from background_task.models import Task
+from background_task import background
 
 _recorded = []
 
@@ -22,38 +23,55 @@ class TestBackgroundDecorator(unittest.TestCase):
 
     def test_get_proxy(self):
         proxy = tasks.background()(empty_task)
-        self.failIfEqual(proxy, empty_task)
+        self.assertNotEqual(proxy, empty_task)
+        self.assertTrue(isinstance(proxy, TaskProxy))
+        
+        # and alternate form
+        proxy = tasks.background(empty_task)
+        self.assertNotEqual(proxy, empty_task)
+        self.assertTrue(isinstance(proxy, TaskProxy))
 
     def test_default_name(self):
         proxy = tasks.background()(empty_task)
-        self.failUnlessEqual(proxy.name, 'background_task.tests.empty_task')
+        self.assertEqual(proxy.name, 'background_task.tests.empty_task')
 
         proxy = tasks.background()(record_task)
-        self.failUnlessEqual(proxy.name, 'background_task.tests.record_task')
+        self.assertEqual(proxy.name, 'background_task.tests.record_task')
+        
+        proxy = tasks.background(empty_task)
+        print proxy
+        self.assertTrue(isinstance(proxy, TaskProxy))
+        self.assertEqual(proxy.name, 'background_task.tests.empty_task')
 
     def test_specified_name(self):
         proxy = tasks.background(name='mytask')(empty_task)
-        self.failUnlessEqual(proxy.name, 'mytask')
+        self.assertEqual(proxy.name, 'mytask')
 
     def test_task_function(self):
         proxy = tasks.background()(empty_task)
-        self.failUnlessEqual(proxy.task_function, empty_task)
+        self.assertEqual(proxy.task_function, empty_task)
 
         proxy = tasks.background()(record_task)
-        self.failUnlessEqual(proxy.task_function, record_task)
+        self.assertEqual(proxy.task_function, record_task)
 
     def test_default_schedule(self):
         proxy = tasks.background()(empty_task)
-        self.failUnlessEqual(TaskSchedule(), proxy.schedule)
+        self.assertEqual(TaskSchedule(), proxy.schedule)
 
     def test_schedule(self):
         proxy = tasks.background(schedule=10)(empty_task)
-        self.failUnlessEqual(TaskSchedule(run_at=10), proxy.schedule)
+        self.assertEqual(TaskSchedule(run_at=10), proxy.schedule)
 
     def test__unicode__(self):
         proxy = tasks.background()(empty_task)
-        self.failUnlessEqual(u'TaskProxy(background_task.tests.empty_task)',
+        self.assertEqual(u'TaskProxy(background_task.tests.empty_task)',
                              unicode(proxy))
+    
+    def test_shortcut(self):
+        '''check shortcut to decorator works'''
+        proxy = background()(empty_task)
+        self.failIfEqual(proxy, empty_task)
+        self.assertEqual(proxy.task_function, empty_task)
 
 
 class TestTaskProxy(unittest.TestCase):
@@ -64,22 +82,22 @@ class TestTaskProxy(unittest.TestCase):
 
     def test_run_task(self):
         tasks.run_task(self.proxy.name, [], {})
-        self.failUnlessEqual(((), {}), _recorded.pop())
+        self.assertEqual(((), {}), _recorded.pop())
 
         tasks.run_task(self.proxy.name, ['hi'], {})
-        self.failUnlessEqual((('hi',), {}), _recorded.pop())
+        self.assertEqual((('hi',), {}), _recorded.pop())
 
         tasks.run_task(self.proxy.name, [], {'kw': 1})
-        self.failUnlessEqual(((), {'kw': 1}), _recorded.pop())
+        self.assertEqual(((), {'kw': 1}), _recorded.pop())
 
 
 class TestTaskSchedule(unittest.TestCase):
 
     def test_priority(self):
-        self.failUnlessEqual(0, TaskSchedule().priority)
-        self.failUnlessEqual(0, TaskSchedule(priority=0).priority)
-        self.failUnlessEqual(1, TaskSchedule(priority=1).priority)
-        self.failUnlessEqual(2, TaskSchedule(priority=2).priority)
+        self.assertEqual(0, TaskSchedule().priority)
+        self.assertEqual(0, TaskSchedule(priority=0).priority)
+        self.assertEqual(1, TaskSchedule(priority=1).priority)
+        self.assertEqual(2, TaskSchedule(priority=2).priority)
 
     def _within_one_second(self, d1, d2):
         self.failUnless(isinstance(d1, datetime))
@@ -109,16 +127,16 @@ class TestTaskSchedule(unittest.TestCase):
     def test_create(self):
         fixed_dt = datetime.now() + timedelta(seconds=10)
         schedule = TaskSchedule.create({'run_at': fixed_dt})
-        self.failUnlessEqual(schedule.run_at, fixed_dt)
-        self.failUnlessEqual(0, schedule.priority)
-        self.failUnlessEqual(TaskSchedule.SCHEDULE, schedule.action)
+        self.assertEqual(schedule.run_at, fixed_dt)
+        self.assertEqual(0, schedule.priority)
+        self.assertEqual(TaskSchedule.SCHEDULE, schedule.action)
 
         schedule = {'run_at': fixed_dt, 'priority': 2,
                     'action': TaskSchedule.RESCHEDULE_EXISTING}
         schedule = TaskSchedule.create(schedule)
-        self.failUnlessEqual(schedule.run_at, fixed_dt)
-        self.failUnlessEqual(2, schedule.priority)
-        self.failUnlessEqual(TaskSchedule.RESCHEDULE_EXISTING, schedule.action)
+        self.assertEqual(schedule.run_at, fixed_dt)
+        self.assertEqual(2, schedule.priority)
+        self.assertEqual(TaskSchedule.RESCHEDULE_EXISTING, schedule.action)
 
         schedule = TaskSchedule.create(0)
         self._within_one_second(schedule.run_at, datetime.now())
@@ -128,9 +146,9 @@ class TestTaskSchedule(unittest.TestCase):
                                 datetime.now() + timedelta(seconds=10))
 
         schedule = TaskSchedule.create(TaskSchedule(run_at=fixed_dt))
-        self.failUnlessEqual(schedule.run_at, fixed_dt)
-        self.failUnlessEqual(0, schedule.priority)
-        self.failUnlessEqual(TaskSchedule.SCHEDULE, schedule.action)
+        self.assertEqual(schedule.run_at, fixed_dt)
+        self.assertEqual(0, schedule.priority)
+        self.assertEqual(TaskSchedule.SCHEDULE, schedule.action)
 
     def test_merge(self):
         default = TaskSchedule(run_at=10, priority=2,
@@ -139,24 +157,24 @@ class TestTaskSchedule(unittest.TestCase):
 
         self._within_one_second(datetime.now() + timedelta(seconds=20),
                                 schedule.run_at)
-        self.failUnlessEqual(2, schedule.priority)
-        self.failUnlessEqual(TaskSchedule.RESCHEDULE_EXISTING, schedule.action)
+        self.assertEqual(2, schedule.priority)
+        self.assertEqual(TaskSchedule.RESCHEDULE_EXISTING, schedule.action)
 
         schedule = TaskSchedule.create({'priority': 0}).merge(default)
         self._within_one_second(datetime.now() + timedelta(seconds=10),
                                 schedule.run_at)
-        self.failUnlessEqual(0, schedule.priority)
-        self.failUnlessEqual(TaskSchedule.RESCHEDULE_EXISTING, schedule.action)
+        self.assertEqual(0, schedule.priority)
+        self.assertEqual(TaskSchedule.RESCHEDULE_EXISTING, schedule.action)
 
         action = TaskSchedule.CHECK_EXISTING
         schedule = TaskSchedule.create({'action': action}).merge(default)
         self._within_one_second(datetime.now() + timedelta(seconds=10),
                                 schedule.run_at)
-        self.failUnlessEqual(2, schedule.priority)
-        self.failUnlessEqual(action, schedule.action)
+        self.assertEqual(2, schedule.priority)
+        self.assertEqual(action, schedule.action)
 
     def test_repr(self):
-        self.failUnlessEqual('TaskSchedule(run_at=10, priority=0)',
+        self.assertEqual('TaskSchedule(run_at=10, priority=0)',
                              repr(TaskSchedule(run_at=10, priority=0)))
 
 
@@ -173,10 +191,10 @@ class TestSchedulingTasks(TransactionTestCase):
         set_result(1)
 
         all_tasks = Task.objects.all()
-        self.failUnlessEqual(1, all_tasks.count())
+        self.assertEqual(1, all_tasks.count())
         task = all_tasks[0]
-        self.failUnlessEqual('test_background_gets_scheduled', task.task_name)
-        self.failUnlessEqual('[[1], {}]', task.task_params)
+        self.assertEqual('test_background_gets_scheduled', task.task_name)
+        self.assertEqual('[[1], {}]', task.task_params)
 
     def test_reschedule_existing(self):
 
@@ -193,9 +211,9 @@ class TestSchedulingTasks(TransactionTestCase):
         reschedule_fn(schedule=90)
 
         all_tasks = Task.objects.all()
-        self.failUnlessEqual(1, all_tasks.count())
+        self.assertEqual(1, all_tasks.count())
         task = all_tasks[0]
-        self.failUnlessEqual('test_reschedule_existing', task.task_name)
+        self.assertEqual('test_reschedule_existing', task.task_name)
 
         # check task is scheduled for later on
         now = datetime.now()
@@ -217,9 +235,9 @@ class TestSchedulingTasks(TransactionTestCase):
         check_fn(schedule=90)
 
         all_tasks = Task.objects.all()
-        self.failUnlessEqual(1, all_tasks.count())
+        self.assertEqual(1, all_tasks.count())
         task = all_tasks[0]
-        self.failUnlessEqual('test_check_existing', task.task_name)
+        self.assertEqual('test_check_existing', task.task_name)
 
         # check new task is scheduled for the earlier time
         now = datetime.now()
@@ -245,9 +263,9 @@ class TestTaskRunner(TransactionTestCase):
         locked_task = self.runner.get_task_to_run()
         self.failIf(locked_task is None)
         self.failIf(locked_task.locked_by is None)
-        self.failUnlessEqual(self.runner.worker_name, locked_task.locked_by)
+        self.assertEqual(self.runner.worker_name, locked_task.locked_by)
         self.failIf(locked_task.locked_at is None)
-        self.failUnlessEqual('mytask', locked_task.task_name)
+        self.assertEqual('mytask', locked_task.task_name)
 
 
 class TestTaskModel(TransactionTestCase):
@@ -259,9 +277,9 @@ class TestTaskModel(TransactionTestCase):
         self.failUnless(task.locked_at is None)
 
         locked_task = task.lock('mylock')
-        self.failUnlessEqual('mylock', locked_task.locked_by)
+        self.assertEqual('mylock', locked_task.locked_by)
         self.failIf(locked_task.locked_at is None)
-        self.failUnlessEqual(task.pk, locked_task.pk)
+        self.assertEqual(task.pk, locked_task.pk)
 
     def test_lock_contested(self):
         # locking should actually look at db, not object
@@ -288,7 +306,7 @@ class TestTaskModel(TransactionTestCase):
 
     def test__unicode__(self):
         task = Task.objects.new_task('mytask')
-        self.failUnlessEqual(u'Task(mytask)', unicode(task))
+        self.assertEqual(u'Task(mytask)', unicode(task))
 
 
 class TestTasks(TransactionTestCase):
@@ -335,26 +353,26 @@ class TestTasks(TransactionTestCase):
 
         for field, value in [('one', '1'), ('two', '2'), ('three', '3')]:
             self.failUnless(hasattr(self, field))
-            self.failUnlessEqual(value, getattr(self, field))
+            self.assertEqual(value, getattr(self, field))
 
     def test_run_next_task_error_handling(self):
         self.throws_error()
 
         all_tasks = Task.objects.all()
-        self.failUnlessEqual(1, all_tasks.count())
+        self.assertEqual(1, all_tasks.count())
         original_task = all_tasks[0]
 
         # should run, but trigger error
         self.failUnless(tasks.run_next_task())
 
         all_tasks = Task.objects.all()
-        self.failUnlessEqual(1, all_tasks.count())
+        self.assertEqual(1, all_tasks.count())
 
         failed_task = all_tasks[0]
         # should have an error recorded
         self.failIfEqual('', failed_task.last_error)
         self.failUnless(failed_task.failed_at is None)
-        self.failUnlessEqual(1, failed_task.attempts)
+        self.assertEqual(1, failed_task.attempts)
 
         # should have been rescheduled for the future
         # and no longer locked
@@ -367,7 +385,7 @@ class TestTasks(TransactionTestCase):
         self.failIf(hasattr(self, 'locked'))
 
         all_tasks = Task.objects.all()
-        self.failUnlessEqual(1, all_tasks.count())
+        self.assertEqual(1, all_tasks.count())
         original_task = all_tasks[0]
         original_task.lock('lockname')
 
@@ -375,13 +393,13 @@ class TestTasks(TransactionTestCase):
 
         self.failIf(hasattr(self, 'locked'))
         all_tasks = Task.objects.all()
-        self.failUnlessEqual(1, all_tasks.count())
+        self.assertEqual(1, all_tasks.count())
 
     def test_run_next_task_unlocks_after_MAX_RUN_TIME(self):
         self.set_fields(lock_overridden=True)
 
         all_tasks = Task.objects.all()
-        self.failUnlessEqual(1, all_tasks.count())
+        self.assertEqual(1, all_tasks.count())
         original_task = all_tasks[0]
         locked_task = original_task.lock('lockname')
 
@@ -397,7 +415,7 @@ class TestTasks(TransactionTestCase):
         # so now we should be able to override the lock
         # and run the task
         self.failUnless(tasks.run_next_task())
-        self.failUnlessEqual(0, Task.objects.count())
+        self.assertEqual(0, Task.objects.count())
 
         self.failUnless(hasattr(self, 'lock_overridden'))
         self.failUnless(self.lock_overridden)
@@ -412,7 +430,7 @@ class TestTasks(TransactionTestCase):
         default_schedule_used_for_time()
 
         all_tasks = Task.objects.all()
-        self.failUnlessEqual(1, all_tasks.count())
+        self.assertEqual(1, all_tasks.count())
         task = all_tasks[0]
 
         self.failUnless(now < task.run_at)
@@ -430,9 +448,9 @@ class TestTasks(TransactionTestCase):
         default_schedule_used_for_priority()
 
         all_tasks = Task.objects.all()
-        self.failUnlessEqual(1, all_tasks.count())
+        self.assertEqual(1, all_tasks.count())
         task = all_tasks[0]
-        self.failUnlessEqual(2, task.priority)
+        self.assertEqual(2, task.priority)
 
     def test_non_default_schedule_used(self):
         default_run_at = datetime.now() + timedelta(seconds=90)
@@ -446,9 +464,9 @@ class TestTasks(TransactionTestCase):
         default_schedule_used_for_priority(schedule=run_at)
 
         all_tasks = Task.objects.all()
-        self.failUnlessEqual(1, all_tasks.count())
+        self.assertEqual(1, all_tasks.count())
         task = all_tasks[0]
-        self.failUnlessEqual(run_at, task.run_at)
+        self.assertEqual(run_at, task.run_at)
 
     def test_failed_at_set_after_MAX_ATTEMPTS(self):
         @tasks.background(name='test_failed_at_set_after_MAX_ATTEMPTS')
@@ -458,7 +476,7 @@ class TestTasks(TransactionTestCase):
         failed_at_set_after_MAX_ATTEMPTS()
 
         available = Task.objects.find_available()
-        self.failUnlessEqual(1, available.count())
+        self.assertEqual(1, available.count())
         task = available[0]
 
         self.failUnless(task.failed_at is None)
@@ -471,10 +489,10 @@ class TestTasks(TransactionTestCase):
         self.failUnless(tasks.run_next_task())
         
         available = Task.objects.find_available()
-        self.failUnlessEqual(0, available.count())
+        self.assertEqual(0, available.count())
 
         all_tasks = Task.objects.all()
-        self.failUnlessEqual(1, all_tasks.count())
+        self.assertEqual(1, all_tasks.count())
         task = all_tasks[0]
 
         self.failIf(task.failed_at is None)

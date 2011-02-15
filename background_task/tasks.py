@@ -18,6 +18,14 @@ class Tasks(object):
         something that gets run asynchronously in
         the background, at a later time
         '''
+        
+        # see if used as simple decorator
+        # where first arg is the function to be decorated
+        fn = None
+        if name and callable(name):
+            fn = name
+            name = None
+        
         def _decorator(fn):
             _name = name
             if not _name:
@@ -25,6 +33,9 @@ class Tasks(object):
             proxy = TaskProxy(_name, fn, schedule, self._runner)
             self._tasks[_name] = proxy
             return proxy
+        
+        if fn:
+            return _decorator(fn)
 
         return _decorator
 
