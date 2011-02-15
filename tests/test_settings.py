@@ -7,10 +7,8 @@ DATABASE_NAME = ':memory:'
 INSTALLED_APPS = [ 'background_task' ]
 
 
-# enable this for coverage (using django coverage)
-# http://pypi.python.org/pypi/django-coverage/1.0.1
-RUN_COVERAGE = 'test_coverage' in sys.argv
+# http://pypi.python.org/pypi/django-coverage
 
-if RUN_COVERAGE:
-    INSTALLED_APPS.append('django_coverage')
-    COVERAGE_REPORT_HTML_OUTPUT_DIR = 'html_coverage'
+INSTALLED_APPS.append('django_coverage')
+COVERAGE_REPORT_HTML_OUTPUT_DIR = 'html_coverage'
+COVERAGE_MODULE_EXCLUDES = []
