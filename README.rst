@@ -14,18 +14,18 @@ There are two parts to using background tasks:
 Creating and registering tasks
 ==============================
 
-To register a task use the tasks.background decorator::
+To register a task use the background decorator::
 
-    from background_task.tasks import tasks
+    from background_task import background
     from django.contrib.auth.models import User
     
-    @tasks.background(schedule=60)
+    @background(schedule=60)
     def notify_user(user_id):
         # lookup user by id and send them a message
         user = User.objects.get(pk=user_id)
         user.email_user('Here is a notification', 'You have been notified')
 
-This will convert the notify_user into a background task function.  When you call it form regular code it will actually create a Task object and stores it in the database.  The database then contains serialised information about which function actually needs running later on.  This does place limits on the parameters that can be passed when calling the function - they must all be serializable as JSON.  Hence why in the example above a user_id is passed rather than a User object.
+This will convert the notify_user into a background task function.  When you call it from regular code it will actually create a Task object and stores it in the database.  The database then contains serialised information about which function actually needs running later on.  This does place limits on the parameters that can be passed when calling the function - they must all be serializable as JSON.  Hence why in the example above a user_id is passed rather than a User object.
 
 Calling notify_user as normal will schedule the original function to be run 60 seconds from now::
 
