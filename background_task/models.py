@@ -106,3 +106,6 @@ class Task(models.Model):
 
     def __unicode__(self):
         return u'Task(%s)' % self.task_name
+
+    class Meta:
+        db_table = 'background_task'
