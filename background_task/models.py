@@ -83,7 +83,7 @@ class Task(models.Model):
         return None
 
     def reschedule(self, err):
-        self.last_error = getattr(err, 'message', str(err))
+        self.last_error = u', '.join(getattr(err, 'args', [unicode(err)]))
         max_attempts = getattr(settings, 'MAX_ATTEMPTS', 25)
 
         if self.attempts >= max_attempts:
