@@ -1,5 +1,6 @@
 .coverage
 *.pyc
+*.swp
 .DS_Store
 /django_background_task.egg-info
 /html_coverage
