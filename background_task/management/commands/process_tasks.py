@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 import time
 from optparse import make_option
 import logging
+import sys
 
 from background_task.tasks import tasks, autodiscover
 
@@ -26,6 +27,10 @@ class Command(BaseCommand):
                 action='store',
                 dest='log_file',
                 help='Log file destination'),
+            make_option('--log-std',
+                action='store_true',
+                dest='log_std',
+                help='Redirect stdout and stderr to the logging system'),            
             make_option('--log-level',
                 action='store',
                 type='choice',
@@ -34,7 +39,8 @@ class Command(BaseCommand):
                 help='Set logging level (%s)' % ', '.join(LOG_LEVELS)),
             )
     
-    def _configure_logging(self, log_level, log_file):
+    def _configure_logging(self, log_level, log_file, log_std):
+
         if log_level:
             log_level = getattr(logging, log_level)
         
@@ -46,14 +52,26 @@ class Command(BaseCommand):
         
         if config:
             logging.basicConfig(**config)
+
+        if log_std:
+            class StdOutWrapper(object):
+                def write(self, s):
+                    logging.info(s)
+            class StdErrWrapper(object):
+                def write(self, s):
+                    logging.error(s)
+            sys.stdout = StdOutWrapper()
+            sys.stderr = StdErrWrapper()
+
     
     def handle(self, *args, **options):
         log_level = options.pop('log_level', None)
         log_file = options.pop('log_file', None)
+        log_std = options.pop('log_std', False)
         duration = options.pop('duration', 0)
         sleep = options.pop('sleep', 5.0)
         
-        self._configure_logging(log_level, log_file)
+        self._configure_logging(log_level, log_file, log_std)
         
         autodiscover()
         
