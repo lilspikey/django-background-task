@@ -81,9 +81,12 @@ class Task(models.Model):
         if updated:
             return Task.objects.get(pk=self.pk)
         return None
-
+    
+    def _extract_error(self, err):
+        return unicode(err)
+    
     def reschedule(self, err):
-        self.last_error = u', '.join(unicode(e) for e in getattr(err, 'args', [unicode(err)]))
+        self.last_error = self._extract_error(err)
         max_attempts = getattr(settings, 'MAX_ATTEMPTS', 25)
 
         if self.attempts >= max_attempts:
