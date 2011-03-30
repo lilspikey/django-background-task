@@ -5,6 +5,8 @@ from django.conf import settings
 from django.utils import simplejson
 from datetime import datetime, timedelta
 from hashlib import sha1
+import traceback
+from StringIO import StringIO
 
 # inspired by http://github.com/tobi/delayed_job
 
@@ -82,11 +84,13 @@ class Task(models.Model):
             return Task.objects.get(pk=self.pk)
         return None
     
-    def _extract_error(self, err):
-        return unicode(err)
+    def _extract_error(self, type, err, tb):
+        file = StringIO()
+        traceback.print_exception(type, err, tb, None, file)
+        return file.getvalue()
     
-    def reschedule(self, err):
-        self.last_error = self._extract_error(err)
+    def reschedule(self, type, err, traceback):
+        self.last_error = self._extract_error(type, err, traceback)
         max_attempts = getattr(settings, 'MAX_ATTEMPTS', 25)
 
         if self.attempts >= max_attempts:

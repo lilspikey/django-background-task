@@ -2,6 +2,7 @@ from models import Task
 
 import os
 import logging
+import sys
 from datetime import datetime, timedelta
 from django.db import transaction
 from django.utils.importlib import import_module
@@ -160,9 +161,11 @@ class DBTaskRunner(object):
             # task done, so can delete it
             task.delete()
             logging.info('Ran task and deleting %s', task)
-        except Exception, e:
+        except Exception:
             logging.warn('Rescheduling %s', task)
-            task.reschedule(e)
+            t, e, traceback = sys.exc_info()
+            task.reschedule(t, e, traceback)
+            del traceback
 
     def run_next_task(self, tasks):
         # we need to commit to make sure
