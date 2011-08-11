@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from hashlib import sha1
 import traceback
 from StringIO import StringIO
+import logging
 
 # inspired by http://github.com/tobi/delayed_job
 
@@ -95,10 +96,13 @@ class Task(models.Model):
 
         if self.attempts >= max_attempts:
             self.failed_at = datetime.now()
+            logging.warn('Marking task %s as failed', self)
         else:
             self.attempts += 1
             backoff = timedelta(seconds=(self.attempts ** 4) + 5)
             self.run_at = datetime.now() + backoff
+            logging.warn('Rescheduling task %s for %s later at %s', self,
+                backoff, self.run_at)
 
         # and unlock
         self.locked_by = None

@@ -48,5 +48,36 @@ This will simply poll the database queue every few seconds to see if there is a 
 
 NB: to aid the management task in finding the registered tasks it is best to put them in a file called 'tasks.py'.  You can put them elsewhere, but you have to ensure that they will be imported so the decorator can register them with the scheduler.  By putting them in tasks.py they will be auto-discovered and the file automatically imported by the management command.
 
+The process_tasks management command has the following options:
+
+* `--duration` - Run task for this many seconds (0 or less to run forever) - default is 0
+* `--sleep` - Sleep for this many seconds before checking for new tasks (if none were found) - default is 5
+* `--log-file` - Log file destination
+* `--log-std` - Redirect stdout and stderr to the logging system
+* `--log-level` - Set logging level (CRITICAL, ERROR, WARNING, INFO,
+                        DEBUG)
+
+You can use the `duration` option for simple process control, by running the management command via a cron job and setting the duration to the time till cron calls the command again.  This way if the command fails it will get restarted by the cron job later anyway.  It also avoids having to worry about resource/memory leaks too much.  The alternative is to use a grown-up program like supervisord_ to handle this for you.
+
+Settings
+========
+
+There are two settings that can be set in your `settings.py` file.
+
+* `MAX_ATTEMPTS` - controls how many times a task will be attempted (default 25)
+* `MAX_RUN_TIME` - maximum possible task run time, after which tasks will be unlocked and tried again (default 3600 seconds)
+
+Task errors
+===========
+
+Tasks are retried if they fail and the error recorded in last_error (and logged).  A task is retried as it may be a temporary issue, such as a transient network problem.  However each time a task is retried it is retried later and later, using an exponential back off, based on the number of attempts::
+
+    (attempts ** 4) + 5
+
+This means that initially the task will be tried again a few seconds later.  After four attempts the task is tried again 261 seconds later (about four minutes).  At twenty five attempts the task will not be tried again for nearly four days!  It is not unheard of for a transient error to last a long time and this behavior is intended to stop tasks that are triggering errors constantly (i.e. due to a coding error) form dominating task processing.  You should probably monitor the task queue to check for tasks that have errors.  After `MAX_ATTEMPTS` the task will be marked as failed and will not be rescheduled again.
+
+
 .. _Django: http://www.djangoproject.com/
 .. _DelayedJob: http://github.com/tobi/delayed_job
+.. _supervisord: http://supervisord.org/
+
