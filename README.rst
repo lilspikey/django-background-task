@@ -50,12 +50,11 @@ NB: to aid the management task in finding the registered tasks it is best to put
 
 The process_tasks management command has the following options:
 
-* `--duration` - Run task for this many seconds (0 or less to run forever) - default is 0
-* `--sleep` - Sleep for this many seconds before checking for new tasks (if none were found) - default is 5
-* `--log-file` - Log file destination
-* `--log-std` - Redirect stdout and stderr to the logging system
-* `--log-level` - Set logging level (CRITICAL, ERROR, WARNING, INFO,
-                        DEBUG)
+* `duration` - Run task for this many seconds (0 or less to run forever) - default is 0
+* `sleep` - Sleep for this many seconds before checking for new tasks (if none were found) - default is 5
+* `log-file` - Log file destination
+* `log-std` - Redirect stdout and stderr to the logging system
+* `log-level` - Set logging level (CRITICAL, ERROR, WARNING, INFO, DEBUG)
 
 You can use the `duration` option for simple process control, by running the management command via a cron job and setting the duration to the time till cron calls the command again.  This way if the command fails it will get restarted by the cron job later anyway.  It also avoids having to worry about resource/memory leaks too much.  The alternative is to use a grown-up program like supervisord_ to handle this for you.
 
