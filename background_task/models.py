@@ -9,9 +9,13 @@ import traceback
 from StringIO import StringIO
 import logging
 
-from datetime import datetime
+try:
+    from django.utils import timezone
+    datetime_now = timezone.now
+except ImportError:
+    from datetime import datetime
+    datetime_now = datetime.now
 
-datetime_now = datetime.now
 
 # inspired by http://github.com/tobi/delayed_job
 
