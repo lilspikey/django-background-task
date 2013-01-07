@@ -1,14 +1,16 @@
 from setuptools import setup, find_packages
- 
+
+version = __import__('background_task').__version__
+
 setup(
     name='django-background-task',
-    version=__import__('background_task').__version__,
+    version=version,
     description='Database backed asynchronous task queue',
     long_description=open('README.rst').read(),
     author='John Montgomery',
     author_email='john@littlespikeyland.com',
     url='http://github.com/lilspikey/django-background-task',
-    download_url='http://github.com/lilspikey/django-background-task/downloads',
+    download_url='https://github.com/lilspikey/django-background-task/archive/v%s.zip' % version,
     license='BSD',
     packages=find_packages(exclude=['ez_setup']),
     include_package_data=True,
