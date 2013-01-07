@@ -4,6 +4,17 @@ DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 DATABASE_ENGINE = 'sqlite3'
 DATABASE_NAME = ':memory:'
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.%s' % DATABASE_ENGINE,
+        'NAME': DATABASE_NAME,
+        'USER': '',                      # Not used with sqlite3.
+        'PASSWORD': '',                  # Not used with sqlite3.
+    }
+}
+
+
 INSTALLED_APPS = [ 'background_task' ]
 
 
