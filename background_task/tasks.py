@@ -1,4 +1,4 @@
-from models import Task
+from models import Task, datetime_now
 
 import os
 import logging
@@ -87,11 +87,11 @@ class TaskSchedule(object):
 
     @property
     def run_at(self):
-        run_at = self._run_at or datetime.now()
+        run_at = self._run_at or datetime_now()
         if isinstance(run_at, int):
-            run_at = datetime.now() + timedelta(seconds=run_at)
+            run_at = datetime_now() + timedelta(seconds=run_at)
         if isinstance(run_at, timedelta):
-            run_at = datetime.now() + run_at
+            run_at = datetime_now() + run_at
         return run_at
 
     @property
@@ -130,7 +130,7 @@ class DBTaskRunner(object):
 
         if action != TaskSchedule.SCHEDULE:
             task_hash = task.task_hash
-            unlocked = Task.objects.unlocked(datetime.now())
+            unlocked = Task.objects.unlocked(datetime_now())
             existing = unlocked.filter(task_hash=task_hash)
             if action == TaskSchedule.RESCHEDULE_EXISTING:
                 updated = existing.update(run_at=run_at, priority=priority)

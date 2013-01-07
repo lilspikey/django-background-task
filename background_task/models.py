@@ -3,11 +3,15 @@ from django.db.models import Q
 from django.conf import settings
 
 from django.utils import simplejson
-from datetime import datetime, timedelta
+from datetime import timedelta
 from hashlib import sha1
 import traceback
 from StringIO import StringIO
 import logging
+
+from datetime import datetime
+
+datetime_now = datetime.now
 
 # inspired by http://github.com/tobi/delayed_job
 
@@ -15,7 +19,7 @@ import logging
 class TaskManager(models.Manager):
 
     def find_available(self):
-        now = datetime.now()
+        now = datetime_now()
         qs = self.unlocked(now)
         ready = qs.filter(run_at__lte=now, failed_at=None)
         return ready.order_by('-priority', 'run_at')
@@ -32,7 +36,7 @@ class TaskManager(models.Manager):
         args = args or ()
         kwargs = kwargs or {}
         if run_at is None:
-            run_at = datetime.now()
+            run_at = datetime_now()
 
         task_params = simplejson.dumps((args, kwargs))
         task_hash = sha1(task_name + task_params).hexdigest()
@@ -78,7 +82,7 @@ class Task(models.Model):
         return args, kwargs
 
     def lock(self, locked_by):
-        now = datetime.now()
+        now = datetime_now()
         unlocked = Task.objects.unlocked(now).filter(pk=self.pk)
         updated = unlocked.update(locked_by=locked_by, locked_at=now)
         if updated:
@@ -95,12 +99,12 @@ class Task(models.Model):
         max_attempts = getattr(settings, 'MAX_ATTEMPTS', 25)
 
         if self.attempts >= max_attempts:
-            self.failed_at = datetime.now()
+            self.failed_at = datetime_now()
             logging.warn('Marking task %s as failed', self)
         else:
             self.attempts += 1
             backoff = timedelta(seconds=(self.attempts ** 4) + 5)
-            self.run_at = datetime.now() + backoff
+            self.run_at = datetime_now() + backoff
             logging.warn('Rescheduling task %s for %s later at %s', self,
                 backoff, self.run_at)
 
