@@ -2,12 +2,16 @@ from django.db import models
 from django.db.models import Q
 from django.conf import settings
 
-from django.utils import simplejson
 from datetime import timedelta
 from hashlib import sha1
 import traceback
 from StringIO import StringIO
 import logging
+
+try:
+    import json  # Django >= 1.6
+except ImportError:
+    from django.utils import simplejson as json  # Django <= 1.5
 
 try:
     from django.utils import timezone
@@ -42,7 +46,7 @@ class TaskManager(models.Manager):
         if run_at is None:
             run_at = datetime_now()
 
-        task_params = simplejson.dumps((args, kwargs))
+        task_params = json.dumps((args, kwargs))
         task_hash = sha1(task_name + task_params).hexdigest()
 
         return Task(task_name=task_name,
@@ -80,7 +84,7 @@ class Task(models.Model):
     objects = TaskManager()
 
     def params(self):
-        args, kwargs = simplejson.loads(self.task_params)
+        args, kwargs = json.loads(self.task_params)
         # need to coerce kwargs keys to str
         kwargs = dict((str(k), v) for k, v in kwargs.items())
         return args, kwargs
