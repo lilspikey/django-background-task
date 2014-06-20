@@ -10,7 +10,6 @@ setup(
     author='John Montgomery',
     author_email='john@littlespikeyland.com',
     url='http://github.com/lilspikey/django-background-task',
-    download_url='https://github.com/lilspikey/django-background-task/archive/v%s.zip#egg=django-background-task-%s' % (version, version),
     license='BSD',
     packages=find_packages(exclude=['ez_setup']),
     include_package_data=True,
