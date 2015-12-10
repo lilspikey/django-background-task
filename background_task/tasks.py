@@ -183,7 +183,7 @@ class DBTaskRunner(object):
 class TaskProxy(object):
     def __init__(self, name, task_function, schedule, runner):
         self.name = name
-        self.task_function = task_function
+        self.now = self.task_function = task_function
         self.runner = runner
         self.schedule = TaskSchedule.create(schedule)
 
